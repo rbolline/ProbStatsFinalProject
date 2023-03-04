@@ -3,17 +3,44 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from ghcn import load_daily
 from glob import glob
+import tqdm
+import time
+import collections
 
 # Data files
+start = time.time()
 files = sorted(glob('ghcnd_tiny/*.dly'))
 
-# Load data from each file
-dataframes = map(lambda file: pd.DataFrame.from_records(load_daily(file)), files)
-dataframes = list(dataframes)
+# Load data about stations (we only the station ID and latitude)
+# that are in the northern hemisphere (a.k.a. latitude > 0)
+north_stations = pd.read_fwf("ghcnd-stations.txt", header=None, usecols=[0, 1])
+north_stations.columns = ["station_id", "latitude"]
+north_stations = north_stations[north_stations["latitude"] > 0]
+north_stations.set_index("station_id", inplace=True)
+
+# Convert the dataframe to a dictionary for faster lookup
+north_stations = north_stations["latitude"].to_dict()
+
+# We only care about stations in the northern hemisphere (latitude > 0)
+# So go through the list of files, and only load files corresponding to
+# stations in the northern hemisphere.
+dataframes = []
+for filename in tqdm.tqdm(files):
+    # Get the station name from the filename
+    station_name = filename.split(sep='/')[1][:-4]
+    
+    # Get the latitude of the station if it's in the dictionary (if not, it's -1)
+    latitude = north_stations.get(station_name, -1)
+    
+    # Only load this file if the station is in the northern hemisphere
+    if latitude > 0:
+        station_data = pd.DataFrame.from_records(load_daily(filename))
+        dataframes.append(station_data)
 
 # Combine all the dataframes
 df = pd.concat(dataframes)
 del dataframes
+print("Loaded the data in", time.time() - start, "seconds")
 
 # Extract the temperature data
 filter_ = np.logical_or(df["element"] == "TMIN",
