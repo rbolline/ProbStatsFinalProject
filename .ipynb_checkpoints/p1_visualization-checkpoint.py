@@ -17,8 +17,8 @@ north_stations.columns = ["station_id", "latitude"]
 north_stations = north_stations[north_stations["latitude"] > 0]
 north_stations.set_index("station_id", inplace=True)
 
-
-
+# Convert the dataframe to a dictionary for faster lookup
+north_stations = north_stations["latitude"].to_dict()
 
 # We only care about stations in the northern hemisphere (latitude > 0)
 # So go through the list of files, and only load files corresponding to
@@ -27,11 +27,10 @@ data_all = []
 for filename in tqdm.tqdm(files):
     # Get the station name from the filename
     station_name = filename.split(sep='/')[-1][:-4]
+
     # Get the latitude of the station if it's in the dictionary (if not, it's -1)
-    try:
-        latitude = north_stations['latitude'][station_name]
-    except:
-        latitude = -1
+    latitude = north_stations.get(station_name, -1)
+    
     # Only load this file if the station is in the northern hemisphere (a.k.a. having latitude > 0)
     if latitude < 0:
         continue
@@ -40,20 +39,16 @@ for filename in tqdm.tqdm(files):
     df = pd.DataFrame.from_records(load_daily(filename))
 
     # Extract the temperature data
-    filter_ = np.logical_or(np.logical_or(np.logical_or(
-                                        df["element"] == "TMIN",
-                                        df["element"] == "TMAX"), 
-                                        df["element"] == "PRCP"), 
-                                        df["element"] == "SNOW")
-    
+    filter_ = np.logical_or(df["element"] == "TMIN",
+                            df["element"] == "TMAX")
     temperatures = df[filter_]
-
+    
     # Delete unnecessary columns
     temperatures = temperatures.drop(columns=["measurement", "quality", "source"])
 
     data_all.append(temperatures)
 
-    del filename, station_name, latitude, df, filter_, temperatures
+del filename, station_name, latitude, df, filter_, temperatures
 print("Reading files... DONE")
 
 # Combine all the dataframes
@@ -67,9 +62,8 @@ print(data_all.groupby(by=["station_id"]).mean())
 # For each station and for each day, compute the midpoint temperature by
 # averaging the min and max temperatures
 print("Computing midpoint temperature...")
-mid_temps = data_all.where(np.logical_or(data_all["element"] == "TMIN",
-                            data_all["element"] == "TMAX")).groupby(by=["station_id", "year", "month", "day"]).mean().reset_index()
-print(mid_temps)
+mid_temps = data_all.groupby(by=["station_id", "year", "month", "day"]).mean().reset_index()
+
 # For each station and for each year, compute the average temperature across that year
 avg_yearly_temps_per_station = mid_temps.groupby(by=["station_id", "year"]).mean()["value"].reset_index()
 
@@ -80,44 +74,7 @@ avg_yearly_temps = mid_temps.groupby(by=["year"]).mean()["value"].reset_index()
 # actual temperatures
 avg_yearly_temps["value"] /= 10
 
-print("Computing yearly precipitation...")
-# Extract the precipitation data
-prcp = data_all.where(data_all['element'] == 'PRCP').dropna()
-# Delete missing data, and unnecessary columns
-prcp = prcp[prcp["value"] != -9999]
-
-# For each station and for each year, compute the average temperature across that year
-avg_yearly_prcp_per_station = prcp.groupby(by=["station_id", "year"]).mean()["value"].reset_index()
-
-# For each year, compute the average temperature across stations
-avg_yearly_prcp = avg_yearly_prcp_per_station.groupby(by=["year"]).mean()["value"].reset_index()
-
-print("Computing yearly snowfall...")
-snow = data_all.where(data_all['element'] == 'SNOW').dropna()
-# Delete missing data, and unnecessary columns
-snow = snow[snow["value"] != -9999]
-
-# For each station and for each year, compute the average temperature across that year
-avg_yearly_snow_per_station = snow.groupby(by=["station_id", "year"]).mean()["value"].reset_index()
-
-# For each year, compute the average temperature across stations
-avg_yearly_snow = avg_yearly_snow_per_station.groupby(by=["year"]).mean()["value"].reset_index()
-
-
 # Plot the result
 plt.plot(avg_yearly_temps["year"], avg_yearly_temps["value"])
 plt.show()
 plt.savefig("avg_yearly_temps.png")
-
-
-plt.plot(avg_yearly_prcp["year"], avg_yearly_prcp["value"])
-plt.show()
-plt.savefig("avg_yearly_prcp.png")
-
-
-plt.plot(avg_yearly_snow["year"], avg_yearly_snow["value"])
-plt.show()
-plt.savefig("avg_yearly_snow.png")
-
-
-
