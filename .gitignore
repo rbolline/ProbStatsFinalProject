@@ -2,3 +2,5 @@ ghcnd_small/
 ghcnd_small/**
 ghcnd_tiny/
 ghcnd_tiny/**
+filtered_data.csv
+__pycache__
