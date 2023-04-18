@@ -4,3 +4,4 @@ ghcnd_tiny/
 ghcnd_tiny/**
 filtered_data.csv
 __pycache__
+.ipynb_checkpoints
