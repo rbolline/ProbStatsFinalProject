@@ -58,4 +58,4 @@ data_all = data_all[data_all["value"] != -9999]
 print("Dataframe shape:", data_all.shape)
 
 # Save data to CSV
-data_all.to_csv("filtered_data.csv")
+data_all.to_csv("filtered_data.csv", index=False)
