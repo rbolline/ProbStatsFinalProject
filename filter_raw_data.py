@@ -33,13 +33,13 @@ for filename in tqdm.tqdm(files):
     # All the data for one station
     df = pd.DataFrame.from_records(load_daily(filename))
 
-    # Extract the temperature data
-    filter_ = np.logical_or(np.logical_or(np.logical_or(
-                                        df["element"] == "TMIN",
-                                        df["element"] == "TMAX"), 
-                                        df["element"] == "PRCP"), 
-                                        df["element"] == "SNOW")
-    
+    # Extract only specific metrics - create a filter for doing so
+    metric_names = ["TMIN", "TMAX", "PRCP", "SNOW"]
+
+    filter_ = np.zeros(df.shape[0]).astype(bool)
+    for metric in metric_names:
+        filter_ = np.logical_or(filter_, df["element"] == metric)
+        
     temperatures = df[filter_]
 
     # Delete unnecessary columns
